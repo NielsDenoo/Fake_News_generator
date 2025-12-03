@@ -3,12 +3,35 @@ import json
 import re
 from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import ChatOllama
+
+# Lazy local generator (transformers) to use when Ollama is unavailable
+_LOCAL_PIPE = None
+def _get_local_pipe():
+    global _LOCAL_PIPE
+    if _LOCAL_PIPE is None:
+        try:
+            from transformers import pipeline
+            import torch
+
+            device = 0 if torch.cuda.is_available() else -1
+            model_name = os.getenv("LOCAL_GEN_MODEL", "gpt2")
+            _LOCAL_PIPE = pipeline("text-generation", model=model_name, device=device)
+        except Exception:
+            _LOCAL_PIPE = None
+    return _LOCAL_PIPE
+
+
+def _ollama_base_kwargs():
+    base = os.getenv("OLLAMA_BASE_URL")
+    if base:
+        return {"base_url": base}
+    return {}
 from schemas import ContinuationOptions
 
 
 class ContinuationChain:
     def __init__(self, llm=None):
-        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.8)
+        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.8, **_ollama_base_kwargs())
         self.prompt = PromptTemplate(
             input_variables=["article_text"],
             template=(
@@ -19,8 +42,22 @@ class ContinuationChain:
         )
 
     def generate(self, article_text: str) -> ContinuationOptions:
-        chain = self.prompt | self.llm
-        res = chain.invoke({"article_text": article_text}).content
+        # First try the configured LLM (usually Ollama)
+        try:
+            chain = self.prompt | self.llm
+            res = chain.invoke({"article_text": article_text}).content
+        except Exception as primary_exc:
+            # Attempt local transformers generator as a substitute
+            try:
+                pipe = _get_local_pipe()
+                if pipe is None:
+                    raise primary_exc
+                prompt_text = self.prompt.format(article_text=article_text)
+                gen = pipe(prompt_text, max_new_tokens=256, do_sample=True, temperature=0.8)[0]
+                res = gen.get("generated_text") or gen.get("text") or ""
+            except Exception:
+                # re-raise the original exception to be handled by caller
+                raise primary_exc
         # robust JSON extraction (same strategy as TitleChain)
         def extract_json(text: str):
             try:

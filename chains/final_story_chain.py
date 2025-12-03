@@ -3,9 +3,16 @@ from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import ChatOllama
 
 
+def _ollama_base_kwargs():
+    base = os.getenv("OLLAMA_BASE_URL")
+    if base:
+        return {"base_url": base}
+    return {}
+
+
 class FinalStoryChain:
     def __init__(self, llm=None):
-        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.9)
+        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.9, **_ollama_base_kwargs())
         self.prompt = PromptTemplate(
             input_variables=["article_title", "article_text", "continuation_choice"],
             template=(

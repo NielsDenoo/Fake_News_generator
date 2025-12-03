@@ -1,6 +1,11 @@
 # AI News Storyteller
 
+[![Python Checks](https://github.com/NielsDenoo/Fake_News_generator/actions/workflows/checks.yml/badge.svg)](https://github.com/NielsDenoo/Fake_News_generator/actions/workflows/checks.yml)
+[![Docker Build](https://github.com/NielsDenoo/Fake_News_generator/actions/workflows/docker-build.yml/badge.svg)](https://github.com/NielsDenoo/Fake_News_generator/actions/workflows/docker-build.yml)
+
 Interactive AI news storytelling app using LangChain, Ollama, Stable Diffusion, NewsAPI, and Gradio.
+
+It is a project made for the subject AI Edge.
 
 ## Requirements
 
@@ -42,11 +47,70 @@ pip install -r requirements.txt
 
 ## Run
 
+### Option 1: Run Locally (without Docker)
+
 ```bash
 python -m app
 ```
 
 This starts a Gradio UI at `http://localhost:7860`.
+
+### Option 2: Run with Docker (Recommended)
+
+Docker provides a consistent environment and handles all dependencies automatically.
+
+**Prerequisites:**
+- Docker installed
+- Ollama running on your host machine (`ollama serve`)
+- `.env` file with your `NEWS_API_KEY`
+
+**Quick Start:**
+
+1. Build the Docker image:
+
+```bash
+docker build -t fake_news_generator:test .
+```
+
+2. Run the container with host networking (so it can reach Ollama on localhost):
+
+```bash
+docker run -d --name fake_news_test --network host --env-file .env fake_news_generator:test
+```
+
+3. Access the UI at `http://localhost:7860`
+
+4. Watch progress logs (optional):
+
+```bash
+docker logs -f fake_news_test
+```
+
+5. Stop the container:
+
+```bash
+docker stop fake_news_test
+docker rm fake_news_test
+```
+
+**Notes:**
+- First run downloads SDXL-Turbo model (~7GB) - this takes time
+- Image generation runs on CPU by default (stable but slower, ~30-90s per image)
+- To use GPU: add `-e FORCE_CPU_IMAGE=false` to the docker run command (requires NVIDIA GPU + Docker GPU support)
+- The container uses `--network host` so it can reach Ollama on your host's localhost:11434
+
+**Alternative: Run without host networking**
+
+If you can't use `--network host`, run Ollama on a different port and point to it:
+
+```bash
+docker run -d --name fake_news_test \
+  --env-file .env \
+  -e OLLAMA_BASE_URL="http://host.docker.internal:11434" \
+  --add-host=host.docker.internal:host-gateway \
+  -p 7860:7860 \
+  fake_news_generator:test
+```
 
 ## Usage
 
@@ -62,16 +126,44 @@ This starts a Gradio UI at `http://localhost:7860`.
 If you see connection errors to Ollama:
 - Ensure Ollama is running: `ollama serve`
 - Verify the model is pulled: `ollama list` (should show llama3:8b)
+- If using Docker with `--network host`, Ollama must be running on the host at localhost:11434
+- If using Docker without host networking, set `OLLAMA_BASE_URL` to point to your host
 
-### CUDA Out of Memory
+### Image Generation Hangs or Fails
 
-If image generation fails with CUDA OOM:
-- Close other GPU applications
-- The app will automatically fall back to CPU (slower but works)
+- By default, image generation uses CPU mode (slower but stable)
+- If it hangs: check `docker logs -f fake_news_test` for errors
+- First run downloads SDXL-Turbo (~7GB) which takes time
+- To enable GPU mode: add `-e FORCE_CPU_IMAGE=false` when running the container (requires NVIDIA GPU + nvidia-docker)
 
 ### Missing API Keys
 
 Ensure `NEWS_API_KEY` is set in your `.env` file.
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **Python Checks** (`checks.yml`): Runs on every push and PR
+  - Code formatting with `black`
+  - Type checking with `mypy`
+  - Linting with `flake8`
+  - Unit tests with `pytest`
+
+- **Docker Build** (`docker-build.yml`): Builds and tests Docker image
+  - Builds Docker image on every push and PR
+  - Runs smoke tests to verify the image works
+  - Pushes to GitHub Container Registry on main branch and tags
+  - Available at: `ghcr.io/nielsdenoo/fake-news-generator:latest`
+
+### Using Pre-built Docker Images
+
+Pull and run the latest image from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/nielsdenoo/fake-news-generator:latest
+docker run -d --name fake_news_test --network host --env-file .env ghcr.io/nielsdenoo/fake-news-generator:latest
+```
 
 ## Notes
 

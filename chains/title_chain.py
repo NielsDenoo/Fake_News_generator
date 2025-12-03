@@ -3,12 +3,20 @@ import json
 import re
 from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import ChatOllama
+
+
+def _ollama_base_kwargs():
+    # Allow overriding Ollama host via OLLAMA_BASE_URL env var (e.g. http://host:11434)
+    base = os.getenv("OLLAMA_BASE_URL")
+    if base:
+        return {"base_url": base}
+    return {}
 from schemas import TitlesOutput, Article
 
 
 class TitleChain:
     def __init__(self, llm=None):
-        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.7)
+        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.7, **_ollama_base_kwargs())
         self.prompt = PromptTemplate(
             input_variables=["articles_json"],
             template=(

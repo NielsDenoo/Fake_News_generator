@@ -168,4 +168,27 @@ def create_ui():
 
 
 if __name__ == "__main__":
+    # Before launching, check Ollama connectivity and warn early if unreachable.
+    import urllib.parse
+    import socket
+
+    def check_ollama(host_url: str, timeout: float = 2.0) -> bool:
+        try:
+            parsed = urllib.parse.urlparse(host_url)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 11434
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except Exception:
+            return False
+
+    ollama_base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    if not check_ollama(ollama_base):
+        print(
+            "[Warning] Could not connect to Ollama at",
+            ollama_base,
+            "— the app may fail to generate text.\n"
+            "Start the Ollama server with `ollama serve`, or set OLLAMA_BASE_URL to a reachable host."
+        )
+
     create_ui().launch(server_name="0.0.0.0", share=False)

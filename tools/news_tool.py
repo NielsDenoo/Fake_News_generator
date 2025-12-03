@@ -4,7 +4,21 @@ import random
 from typing import List
 from schemas import Article
 
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
+def _get_news_api_key():
+    # Accept several possible env names and sanitize the value
+    candidates = ["NEWS_API_KEY", "NEWSAPI_KEY", "NEWS_APIKEY"]
+    for name in candidates:
+        v = os.environ.get(name)
+        if not v:
+            continue
+        # strip surrounding whitespace and quotes that users sometimes add
+        v = v.strip().strip('"').strip("'")
+        if v:
+            return v
+    return None
+
+
+NEWS_API_KEY = _get_news_api_key()
 
 
 class NewsTool:

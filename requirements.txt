@@ -1,9 +1,11 @@
 gradio>=3.40.0
-langchain==0.0.375
+# Use a modern, available langchain release; pin below 1.0 to avoid breaking API
+langchain>=0.3.25,<1.0.0
 langchain-community>=0.0.10
 requests>=2.28.0
 pydantic>=1.10.0
 python-dotenv>=1.0.0
+# Torch and diffusers are large; keep them but expect long builds
 torch>=2.0.0
 transformers>=4.30.0
 diffusers>=0.21.0

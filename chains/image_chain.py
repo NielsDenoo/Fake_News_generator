@@ -4,22 +4,44 @@ import base64
 from io import BytesIO
 from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import ChatOllama
+
+
+def _ollama_base_kwargs():
+    base = os.getenv("OLLAMA_BASE_URL")
+    if base:
+        return {"base_url": base}
+    return {}
 import torch
 from diffusers import AutoPipelineForText2Image
 
 
 class ImageChain:
     def __init__(self, llm=None, pipeline=None):
-        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.7)
+        self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.7, **_ollama_base_kwargs())
         
         if pipeline is None:
-            self.pipe = AutoPipelineForText2Image.from_pretrained(
-                "stabilityai/sdxl-turbo",
-                torch_dtype=torch.float16,
-                variant="fp16"
-            )
-            if torch.cuda.is_available():
-                self.pipe = self.pipe.to("cuda")
+            # Force CPU mode for stability (GPU can hang on some systems)
+            force_cpu = os.getenv("FORCE_CPU_IMAGE", "true").lower() in ("1", "true", "yes")
+            
+            if force_cpu:
+                print("[IMAGE] Loading Stable Diffusion on CPU (set FORCE_CPU_IMAGE=false to use GPU)")
+                self.pipe = AutoPipelineForText2Image.from_pretrained(
+                    "stabilityai/sdxl-turbo",
+                    torch_dtype=torch.float32
+                )
+                self.pipe = self.pipe.to("cpu")
+            else:
+                print("[IMAGE] Loading Stable Diffusion on GPU")
+                self.pipe = AutoPipelineForText2Image.from_pretrained(
+                    "stabilityai/sdxl-turbo",
+                    torch_dtype=torch.float16,
+                    variant="fp16"
+                )
+                if torch.cuda.is_available():
+                    self.pipe = self.pipe.to("cuda")
+                else:
+                    print("[IMAGE] Warning: CUDA not available, falling back to CPU")
+                    self.pipe = self.pipe.to("cpu")
         else:
             self.pipe = pipeline
 
@@ -48,6 +70,7 @@ class ImageChain:
 
     def generate(self, final_text: str) -> str:
         # Use LLM to extract components
+        print("[IMAGE] Extracting image prompt components from story using LLM...")
         chain = self.prompt | self.llm
         comp_raw = chain.invoke({"final_text": final_text}).content
         try:
@@ -61,9 +84,11 @@ class ImageChain:
             comps = json.loads(comp_raw[start:end+1])
 
         prompt = self.build_prompt_from_components(comps)
+        print(f"[IMAGE] Prompt extracted. Generating image with Stable Diffusion (this may take 10-60s)...")
 
         # Generate image using local Stable Diffusion
         image = self.pipe(prompt=prompt, num_inference_steps=1, guidance_scale=0.0).images[0]
+        print("[IMAGE] ✓ Image generation complete")
         
         # Convert PIL image to base64
         buffered = BytesIO()
