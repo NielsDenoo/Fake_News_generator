@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+ARG SKIP_HEAVY=false
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
@@ -23,7 +25,12 @@ RUN apt-get update -qq \
 
 # Install Python deps first (cache layer)
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY requirements-ci.txt /app/requirements-ci.txt
+RUN if [ "${SKIP_HEAVY}" = "true" ]; then \
+        pip install --no-cache-dir -r /app/requirements-ci.txt; \
+    else \
+        pip install --no-cache-dir -r /app/requirements.txt; \
+    fi
 
 # Copy project
 COPY . /app

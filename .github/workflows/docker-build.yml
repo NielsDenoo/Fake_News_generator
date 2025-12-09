@@ -39,6 +39,8 @@ jobs:
           push: false
           load: true
           tags: ${{ env.IMAGE_NAME }}:test
+          build-args: |
+            SKIP_HEAVY=true
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
@@ -47,19 +49,22 @@ jobs:
           # Create a minimal .env for testing
           echo "NEWS_API_KEY=test_key_placeholder" > .env.test
           
-          # Run a quick import test to verify the image works
+          # Run a quick import test to verify the image works (with SKIP_HEAVY, heavy ML libs aren't present)
           docker run --rm --env-file .env.test ${{ env.IMAGE_NAME }}:test python -c "
           import sys
           print('Testing imports...')
           try:
               import main
               import app
+              # These imports work even without torch/diffusers due to lazy loading
               from chains import title_chain, continuation_chain, final_story_chain, image_chain
               from tools import news_tool
-              print('✓ All imports successful')
+              print('✓ All imports successful (lightweight build)')
               sys.exit(0)
           except Exception as e:
               print(f'✗ Import failed: {e}')
+              import traceback
+              traceback.print_exc()
               sys.exit(1)
           "
 

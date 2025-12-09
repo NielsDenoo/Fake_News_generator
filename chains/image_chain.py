@@ -11,39 +11,58 @@ def _ollama_base_kwargs():
     if base:
         return {"base_url": base}
     return {}
-import torch
-from diffusers import AutoPipelineForText2Image
+
+# Heavy ML imports are performed lazily inside the class to allow lightweight CI runs
+_HAVE_DIFFUSERS = None
+_HAVE_TORCH = None
 
 
 class ImageChain:
     def __init__(self, llm=None, pipeline=None):
         self.llm = llm or ChatOllama(model="llama3:8b", temperature=0.7, **_ollama_base_kwargs())
-        
-        if pipeline is None:
-            # Force CPU mode for stability (GPU can hang on some systems)
-            force_cpu = os.getenv("FORCE_CPU_IMAGE", "true").lower() in ("1", "true", "yes")
-            
-            if force_cpu:
-                print("[IMAGE] Loading Stable Diffusion on CPU (set FORCE_CPU_IMAGE=false to use GPU)")
-                self.pipe = AutoPipelineForText2Image.from_pretrained(
-                    "stabilityai/sdxl-turbo",
-                    torch_dtype=torch.float32
-                )
-                self.pipe = self.pipe.to("cpu")
-            else:
-                print("[IMAGE] Loading Stable Diffusion on GPU")
-                self.pipe = AutoPipelineForText2Image.from_pretrained(
-                    "stabilityai/sdxl-turbo",
-                    torch_dtype=torch.float16,
-                    variant="fp16"
-                )
-                if torch.cuda.is_available():
-                    self.pipe = self.pipe.to("cuda")
-                else:
-                    print("[IMAGE] Warning: CUDA not available, falling back to CPU")
-                    self.pipe = self.pipe.to("cpu")
-        else:
+        # If a pipeline is given, use it. Otherwise attempt to load diffusers/torch lazily.
+        if pipeline is not None:
             self.pipe = pipeline
+        else:
+            global _HAVE_DIFFUSERS, _HAVE_TORCH
+            try:
+                if _HAVE_DIFFUSERS is None:
+                    import importlib
+
+                    _HAVE_DIFFUSERS = importlib.util.find_spec("diffusers") is not None
+                    _HAVE_TORCH = importlib.util.find_spec("torch") is not None
+                if not _HAVE_DIFFUSERS or not _HAVE_TORCH:
+                    # mark pipe as unavailable; trying to generate an image will raise a clear error
+                    print("[IMAGE] Diffusers/torch not available in this environment; image generation disabled")
+                    self.pipe = None
+                else:
+                    # perform imports now that they are present
+                    import torch
+                    from diffusers import AutoPipelineForText2Image
+                    # Force CPU mode for stability (GPU can hang on some systems)
+                    force_cpu = os.getenv("FORCE_CPU_IMAGE", "true").lower() in ("1", "true", "yes")
+                    if force_cpu:
+                        print("[IMAGE] Loading Stable Diffusion on CPU (set FORCE_CPU_IMAGE=false to use GPU)")
+                        self.pipe = AutoPipelineForText2Image.from_pretrained(
+                            "stabilityai/sdxl-turbo",
+                            torch_dtype=torch.float32,
+                        )
+                        self.pipe = self.pipe.to("cpu")
+                    else:
+                        print("[IMAGE] Loading Stable Diffusion on GPU")
+                        self.pipe = AutoPipelineForText2Image.from_pretrained(
+                            "stabilityai/sdxl-turbo",
+                            torch_dtype=torch.float16,
+                            variant="fp16",
+                        )
+                        if torch.cuda.is_available():
+                            self.pipe = self.pipe.to("cuda")
+                        else:
+                            print("[IMAGE] Warning: CUDA not available, falling back to CPU")
+                            self.pipe = self.pipe.to("cpu")
+            except Exception as e:
+                print(f"[IMAGE] Error loading diffusers/torch: {e}")
+                self.pipe = None
 
         # Prompt to extract cinematic components
         self.prompt = PromptTemplate(
@@ -85,6 +104,10 @@ class ImageChain:
 
         prompt = self.build_prompt_from_components(comps)
         print(f"[IMAGE] Prompt extracted. Generating image with Stable Diffusion (this may take 10-60s)...")
+
+        # Ensure pipeline is available
+        if self.pipe is None:
+            raise RuntimeError("Image pipeline is not available in this environment. Install 'torch' and 'diffusers' or build the Docker image without SKIP_HEAVY.")
 
         # Generate image using local Stable Diffusion
         image = self.pipe(prompt=prompt, num_inference_steps=1, guidance_scale=0.0).images[0]
