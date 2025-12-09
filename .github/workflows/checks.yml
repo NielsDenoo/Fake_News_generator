@@ -53,8 +53,8 @@ jobs:
 
       - name: Type-check with mypy
         run: |
-          # Ignore missing imports for third-party packages to reduce false negatives
-          mypy --ignore-missing-imports .
+          # Use mypy configuration from pyproject.toml
+          mypy .
 
       - name: Lint with flake8
         continue-on-error: true

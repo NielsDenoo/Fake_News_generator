@@ -11,3 +11,18 @@ exclude = '''
   | dist
 )/
 '''
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+explicit_package_bases = true
+exclude = [
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+]
+
+[[tool.mypy.overrides]]
+module = "memory.*"
+ignore_errors = true
