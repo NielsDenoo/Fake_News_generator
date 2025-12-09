@@ -1,7 +1,7 @@
 import os
 import requests
 import random
-from typing import List
+from typing import List, Optional
 from schemas import Article
 
 def _get_news_api_key():
@@ -25,7 +25,7 @@ class NewsTool:
     BASE_URL = "https://newsapi.org/v2/top-headlines"
     CATEGORIES = ["business", "entertainment", "technology", "science", "sports", "health", "general"]
 
-    def __init__(self, api_key: str = None, country: str = "us"):
+    def __init__(self, api_key: Optional[str] = None, country: str = "us"):
         self.api_key = api_key or NEWS_API_KEY
         self.country = country
 

@@ -117,7 +117,9 @@ def generate_continuations_for_session(session_id: str):
         memory.set(session_id, state)
         return fallback_opts
     # Fallback disabled — propagate the last exception so caller (UI) can show an error
-    raise last_exc
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("Continuation generation failed after retries")
 
 
 def select_continuation(session_id: str, index: int):
@@ -161,7 +163,9 @@ def generate_final_and_image(session_id: str):
         import traceback
         traceback.print_exc()
         if not enable_fallback:
-            raise last_exc
+            if last_exc:
+                raise last_exc
+            raise RuntimeError("Final story generation failed after retries")
         # Fallback final story when disabled
         src_text = article.content or article.description or article.title or ""
         paragraph = (src_text[:600] + "...") if len(src_text) > 600 else src_text
@@ -209,7 +213,9 @@ def generate_final_and_image(session_id: str):
     import traceback
     traceback.print_exc()
     if not enable_fallback:
-        raise last_img_exc
+        if last_img_exc:
+            raise last_img_exc
+        raise RuntimeError("Image generation failed after retries")
     # Fallback: return final_story and no image (caller should handle None)
     state.image_base64 = None
     memory.set(session_id, state)
