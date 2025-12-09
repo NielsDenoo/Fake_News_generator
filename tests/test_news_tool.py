@@ -37,5 +37,5 @@ def test_article_dataclass():
     )
     assert article.title == "Test Title"
     assert article.description == "Test Description"
-    assert article.url == "https://example.com"
+    assert str(article.url) == "https://example.com/"  # HttpUrl adds trailing slash
     assert article.content == "Test Content"

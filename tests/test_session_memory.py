@@ -6,8 +6,8 @@ from memory.session_memory import SessionMemory, SessionState
 def test_session_memory_init():
     """Test SessionMemory initialization."""
     memory = SessionMemory()
-    assert isinstance(memory.sessions, dict)
-    assert len(memory.sessions) == 0
+    assert isinstance(memory._store, dict)
+    assert len(memory._store) == 0
 
 
 def test_session_memory_set_and_get():
@@ -15,14 +15,14 @@ def test_session_memory_set_and_get():
     memory = SessionMemory()
     session_id = "test_session_123"
     
-    state = SessionState()
-    state.category = "technology"
+    # Create state with initial data
+    state = SessionState(final_story="Test story")
     
     memory.set(session_id, state)
     retrieved = memory.get(session_id)
     
     assert retrieved is not None
-    assert retrieved.category == "technology"
+    assert retrieved.final_story == "Test story"
 
 
 def test_session_memory_get_nonexistent():
@@ -38,11 +38,8 @@ def test_session_memory_get_nonexistent():
 def test_session_state_defaults():
     """Test SessionState default values."""
     state = SessionState()
-    assert state.category == "general"
     assert state.articles == []
     assert state.selected_article_index is None
-    assert state.creative_titles == []
-    assert state.selected_title_index is None
     assert state.continuation_options == []
     assert state.selected_continuation_index is None
     assert state.final_story is None
