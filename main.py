@@ -38,6 +38,9 @@ def generate_titles_for_session(session_id: str):
     state = memory.get(session_id)
     try:
         titles_out = title_chain.generate(state.articles)
+        # Store the mapping of title index to article index
+        state.title_to_article_map = titles_out.article_indices
+        memory.set(session_id, state)
         return titles_out.titles
     except Exception as e:
         # If generation fails (e.g. Ollama unreachable), fall back to lightweight heuristics
@@ -59,6 +62,9 @@ def generate_titles_for_session(session_id: str):
         while len(fallback) < 3:
             fallback.append(f"Breaking: More to come ({len(fallback)+1})")
             i += 1
+        # Store mapping for fallback titles (map to first 3 articles)
+        state.title_to_article_map = [0, 1, 2]
+        memory.set(session_id, state)
         return fallback
 
 

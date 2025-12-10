@@ -238,7 +238,6 @@ This project uses GitHub Actions for continuous integration and deployment:
   - Builds Docker image on every push and PR
   - Runs smoke tests to verify the image works
   - Pushes to GitHub Container Registry on main branch and tags
-  - Available at: `ghcr.io/nielsdenoo/fake-news-generator:latest`
 
 ### Using Pre-built Docker Images
 

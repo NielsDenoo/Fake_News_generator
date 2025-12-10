@@ -144,7 +144,7 @@ class TitleChain:
             if len(titles_list) >= 3:
                 titles_list = titles_list[:3]
 
-            parsed = {"titles": titles_list}
+            parsed = {"titles": titles_list, "article_indices": [0, 1, 2]}
             try:
                 out = TitlesOutput(**parsed)
                 if len(out.titles) != 3:
@@ -187,7 +187,7 @@ class TitleChain:
                         break
 
             if len(candidates) == 3:
-                parsed = {"titles": candidates}
+                parsed = {"titles": candidates, "article_indices": [0, 1, 2]}
                 try:
                     out = TitlesOutput(**parsed)
                     return out
@@ -213,7 +213,7 @@ class TitleChain:
                 i += 1
 
             print("[TitleChain] Returning fallback titles:", fallback)
-            return TitlesOutput(titles=fallback)
+            return TitlesOutput(titles=fallback, article_indices=[0, 1, 2])
 
 
 __all__ = ["TitleChain"]

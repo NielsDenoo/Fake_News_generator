@@ -12,6 +12,7 @@ class Article(BaseModel):
 
 class TitlesOutput(BaseModel):
     titles: List[str]
+    article_indices: List[int] = []
 
 
 class ContinuationOptions(BaseModel):
@@ -20,6 +21,7 @@ class ContinuationOptions(BaseModel):
 
 class SessionState(BaseModel):
     articles: List[Article] = []
+    title_to_article_map: List[int] = []
     selected_article_index: Optional[int] = None
     continuation_options: List[str] = []
     selected_continuation_index: Optional[int] = None

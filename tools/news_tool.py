@@ -1,6 +1,7 @@
 import os
 import requests
 import random
+import re
 from typing import List, Optional
 from schemas import Article
 
@@ -50,10 +51,18 @@ class NewsTool:
 
         articles = []
         for a in data.get("articles", []):
+            # Strip HTML tags from content and description
+            raw_content = a.get("content") or a.get("description") or ""
+            raw_description = a.get("description") or ""
+            
+            # Remove HTML tags
+            clean_content = re.sub(r'<[^>]+>', '', raw_content)
+            clean_description = re.sub(r'<[^>]+>', '', raw_description)
+            
             article = Article(
                 title=a.get("title") or "",
-                description=a.get("description"),
-                content=a.get("content") or a.get("description"),
+                description=clean_description if clean_description else None,
+                content=clean_content if clean_content else None,
                 image_url=a.get("urlToImage"),
                 url=a.get("url"),
             )

@@ -217,14 +217,35 @@ def create_dash_app():
         ctx = dash.callback_context
         if not ctx.triggered or not any(n_clicks_list):
             return no_update, no_update, no_update
-        prop_id = ctx.triggered[0]["prop_id"]
+        
+        # Get the triggered input
+        triggered_id = ctx.triggered[0]["prop_id"]
+        
+        # Parse the index from the triggered component
+        title_idx = 0
         try:
-            # prop_id looks like '{"type":"title-btn","index":0}.n_clicks'
-            idx = int(prop_id.split('index":')[1].split('}')[0])
-        except Exception:
-            idx = 0
+            import json
+            # Extract the ID part before .n_clicks
+            id_str = triggered_id.split('.')[0]
+            id_dict = json.loads(id_str)
+            title_idx = id_dict.get("index", 0)
+        except Exception as e:
+            # Fallback: try the old method
+            try:
+                title_idx = int(triggered_id.split('index":')[1].split('}')[0])
+            except Exception:
+                title_idx = 0
+        
         try:
-            article = select_article(session_id, idx)
+            # Map title index to article index using the stored mapping
+            state = memory.get(session_id)
+            
+            if title_idx < len(state.title_to_article_map):
+                article_idx = state.title_to_article_map[title_idx]
+            else:
+                article_idx = title_idx  # fallback to direct mapping
+            
+            article = select_article(session_id, article_idx)
             raw_content = article.content or article.description or ""
             import re
 
@@ -349,5 +370,4 @@ if __name__ == "__main__":
             "— the app may fail to generate text. Start the Ollama server with `ollama serve`, or set OLLAMA_BASE_URL to a reachable host.")
 
     dash_app = create_dash_app()
-    # Run on port 7860 for parity with previous Gradio default
     dash_app.run(host="0.0.0.0", port=7860, debug=False)
