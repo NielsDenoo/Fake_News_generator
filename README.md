@@ -5,7 +5,11 @@
 
 Interactive AI news storytelling app using LangChain, Ollama, Stable Diffusion, NewsAPI, and Dash.
 
-It is a project made for the subject AI Edge.
+It is a project made as exercise for the subject AI Edge.
+
+This project allows users to generate fake news stories based on real news articles. It fetches the latest news using NewsAPI, rewrites headlines and story continuations using a local LLM (llama3:8b via Ollama), and generates images with Stable Diffusion SDXL-Turbo.
+
+Furthermore, the entire application runs locally using Docker, ensuring privacy and control over data.
 
 ## Quick Start with Docker (Recommended)
 
@@ -116,7 +120,8 @@ docker run -d --name fake_news_app --network host --env-file .env ghcr.io/nielsd
 1. **Create and activate virtual environment:**
    ```bash
    python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   source .venv/bin/activate  
+   # On Windows: .venv\Scripts\activate
    ```
 
 2. **Install dependencies:**
