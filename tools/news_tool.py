@@ -12,7 +12,7 @@ def _get_news_api_key():
         v = os.environ.get(name)
         if not v:
             continue
-        # strip surrounding whitespace and quotes that users sometimes add
+        # strip surrounding whitespace and quotes
         v = v.strip().strip('"').strip("'")
         if v:
             return v
@@ -51,11 +51,9 @@ class NewsTool:
 
         articles = []
         for a in data.get("articles", []):
-            # Strip HTML tags from content and description
             raw_content = a.get("content") or a.get("description") or ""
             raw_description = a.get("description") or ""
             
-            # Remove HTML tags
             clean_content = re.sub(r'<[^>]+>', '', raw_content)
             clean_description = re.sub(r'<[^>]+>', '', raw_description)
             

@@ -9,6 +9,8 @@ It is a project made as exercise for the subject AI Edge.
 
 This project allows users to generate fake news stories based on real news articles. It fetches the latest news using NewsAPI, rewrites headlines and story continuations using a local LLM (llama3:8b via Ollama), and generates images with Stable Diffusion SDXL-Turbo.
 
+Langchain orchestrates the workflow, while Dash provides an interactive web interface.
+
 Furthermore, the entire application runs locally using Docker, ensuring privacy and control over data.
 
 ## Quick Start with Docker (Recommended)

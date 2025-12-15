@@ -1,5 +1,6 @@
 from typing import List, Optional
-from pydantic import BaseModel, HttpUrl
+from datetime import datetime
+from pydantic import BaseModel, HttpUrl, Field
 
 
 class Article(BaseModel):
@@ -27,3 +28,6 @@ class SessionState(BaseModel):
     selected_continuation_index: Optional[int] = None
     final_story: Optional[str] = None
     image_base64: Optional[str] = None
+    # Session management fields
+    created_at: datetime = Field(default_factory=datetime.now)
+    last_accessed: datetime = Field(default_factory=datetime.now)

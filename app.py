@@ -40,6 +40,7 @@ def create_dash_app():
     app.layout = dbc.Container(
         [
             dcc.Store(id="session-id", data=str(uuid.uuid4())),
+            dcc.Store(id="show-stats", data=False),
             
             # Header
             dbc.Row([
@@ -48,7 +49,9 @@ def create_dash_app():
                         html.H1([html.I(className="fas fa-newspaper me-3"), "AI Fake News Generator"], 
                                className="text-center mb-2 mt-4"),
                         html.P("Generate creative fictional news stories using AI and real headlines",
-                               className="text-center text-muted mb-4")
+                               className="text-center text-muted mb-4"),
+                        html.P("Press Alt+S to toggle statistics",
+                               className="text-center text-muted small")
                     ])
                 ], width=12)
             ]),
@@ -171,6 +174,29 @@ def create_dash_app():
             ], id="final-row", style={"display": "none"}),
 
             html.Div(id="hidden-debug", style={"display": "none"}),
+            
+            # Session Statistics (Admin) - collapsed by default
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.I(className="fas fa-chart-bar me-2"),
+                            "Session Statistics (Admin)",
+                            dbc.Button(
+                                "Refresh Stats",
+                                id="refresh-stats-btn",
+                                color="info",
+                                size="sm",
+                                className="float-end"
+                            ),
+                        ]),
+                        dbc.CardBody([
+                            html.Div(id="session-stats", children="Click refresh to load statistics...")
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ], className="mb-4", id="stats-row", style={"display": "none"}),
+            
             html.Div(style={"height": "50px"}),  # Bottom spacing
         ],
         fluid=True,
@@ -357,6 +383,54 @@ def create_dash_app():
         if story_content:
             return {"display": "block"}
         return {"display": "none"}
+    
+    # Session statistics callback
+    @app.callback(
+        Output("session-stats", "children"),
+        Input("refresh-stats-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def update_stats(n_clicks):
+        stats = memory.get_stats()
+        
+        stats_display = html.Div([
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H4(stats["active_sessions"], className="text-center mb-0"),
+                            html.P("Active Sessions", className="text-center text-muted mb-0")
+                        ])
+                    ], className="bg-primary text-white")
+                ], md=3),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H4(f"{stats['estimated_memory_mb']} MB", className="text-center mb-0"),
+                            html.P("Memory Usage", className="text-center text-muted mb-0")
+                        ])
+                    ], className="bg-info text-white")
+                ], md=3),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H4(f"{stats['average_session_age_seconds']:.1f}s", className="text-center mb-0"),
+                            html.P("Avg Session Age", className="text-center text-muted mb-0")
+                        ])
+                    ], className="bg-success text-white")
+                ], md=3),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H4(f"{stats['timeout_minutes']}min", className="text-center mb-0"),
+                            html.P("Session Timeout", className="text-center text-muted mb-0")
+                        ])
+                    ], className="bg-warning text-dark")
+                ], md=3),
+            ], className="g-3")
+        ])
+        
+        return stats_display
 
     return app
 
