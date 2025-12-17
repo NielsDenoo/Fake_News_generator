@@ -31,3 +31,9 @@ class SessionState(BaseModel):
     # Session management fields
     created_at: datetime = Field(default_factory=datetime.now)
     last_accessed: datetime = Field(default_factory=datetime.now)
+    session_name: Optional[str] = None  # User-friendly name
+    
+    @property
+    def is_complete(self) -> bool:
+        """Check if session has a complete generated story."""
+        return self.final_story is not None and len(self.final_story) > 0

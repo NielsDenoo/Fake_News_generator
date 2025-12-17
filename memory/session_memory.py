@@ -75,6 +75,48 @@ class SessionMemory:
                 "average_session_age_seconds": round(avg_age, 2),
                 "timeout_minutes": self.timeout.total_seconds() / 60,
             }
+    
+    def get_all_sessions(self) -> Dict[str, Dict]:
+        """Get info about all active sessions for history view."""
+        with self._lock:
+            sessions = {}
+            for sid, state in self._store.items():
+                # Create a display name
+                if state.session_name:
+                    name = state.session_name
+                elif state.articles and len(state.articles) > 0:
+                    # Use first article title as name
+                    name = state.articles[0].title[:50] + "..."
+                else:
+                    name = f"Session {sid[:8]}"
+                
+                # Create summary
+                if state.is_complete:
+                    summary = "✅ Completed story"
+                elif state.continuation_options:
+                    summary = "📝 Ready to generate story"
+                elif state.articles:
+                    summary = f"📰 {len(state.articles)} articles loaded"
+                else:
+                    summary = "🆕 New session"
+                
+                sessions[sid] = {
+                    "session_id": sid,
+                    "session_name": name,
+                    "summary": summary,
+                    "created_at": state.created_at.isoformat(),
+                    "last_accessed": state.last_accessed.isoformat(),
+                    "is_complete": state.is_complete,
+                    "has_story": state.final_story is not None,
+                }
+            
+            # Sort by last accessed (newest first)
+            sorted_sessions = dict(
+                sorted(sessions.items(), 
+                       key=lambda x: x[1]["last_accessed"], 
+                       reverse=True)
+            )
+            return sorted_sessions
 
 
 memory = SessionMemory(timeout_minutes=60)

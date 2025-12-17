@@ -40,21 +40,52 @@ def create_dash_app():
     app.layout = dbc.Container(
         [
             dcc.Store(id="session-id", data=str(uuid.uuid4())),
-            dcc.Store(id="show-stats", data=False),
             
-            # Header
+            # Header with Session History Button
             dbc.Row([
                 dbc.Col([
                     html.Div([
                         html.H1([html.I(className="fas fa-newspaper me-3"), "AI Fake News Generator"], 
                                className="text-center mb-2 mt-4"),
                         html.P("Generate creative fictional news stories using AI and real headlines",
-                               className="text-center text-muted mb-4"),
-                        html.P("Press Alt+S to toggle statistics",
-                               className="text-center text-muted small")
+                               className="text-center text-muted mb-3"),
+                        html.Div([
+                            dbc.Button(
+                                [html.I(className="fas fa-history me-2"), "Session History"],
+                                id="show-history-btn",
+                                color="secondary",
+                                size="sm",
+                                outline=True
+                            ),
+                        ], className="d-flex justify-content-center mb-3")
                     ])
                 ], width=12)
             ]),
+            
+            # Session History Panel (collapsed by default)
+            dbc.Collapse(
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.H5([html.I(className="fas fa-history me-2"), "Previous Sessions"], className="mb-0 d-inline-block"),
+                        dbc.Button(
+                            [html.I(className="fas fa-trash me-1"), "Clear History"],
+                            id="clear-history-btn",
+                            color="danger",
+                            size="sm",
+                            outline=True,
+                            className="float-end"
+                        ),
+                    ]),
+                    dbc.CardBody([
+                        dcc.Loading(
+                            id="loading-history",
+                            children=html.Div(id="history-area", children="Loading sessions...")
+                        )
+                    ])
+                ], className="shadow-sm mb-4"),
+                id="history-collapse",
+                is_open=False
+            ),
 
             # News Category Selection Card
             dbc.Row([
@@ -175,42 +206,22 @@ def create_dash_app():
 
             html.Div(id="hidden-debug", style={"display": "none"}),
             
-            # Session Statistics (Admin) - collapsed by default
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader([
-                            html.I(className="fas fa-chart-bar me-2"),
-                            "Session Statistics (Admin)",
-                            dbc.Button(
-                                "Refresh Stats",
-                                id="refresh-stats-btn",
-                                color="info",
-                                size="sm",
-                                className="float-end"
-                            ),
-                        ]),
-                        dbc.CardBody([
-                            html.Div(id="session-stats", children="Click refresh to load statistics...")
-                        ])
-                    ], className="shadow-sm")
-                ], width=12)
-            ], className="mb-4", id="stats-row", style={"display": "none"}),
-            
             html.Div(style={"height": "50px"}),  # Bottom spacing
         ],
         fluid=True,
         className="py-4"
     )
 
-    # Load latest news
+    # Load latest news (creates new session)
     @app.callback(
-        [Output("status", "children"), Output("titles-area", "children")],
+        [Output("status", "children"), Output("titles-area", "children"), Output("session-id", "data", allow_duplicate=True)],
         [Input("load-btn", "n_clicks")],
-        [State("session-id", "data"), State("category", "value")],
+        [State("category", "value")],
         prevent_initial_call=True,
     )
-    def on_load(n_clicks, session_id, category):
+    def on_load(n_clicks, category):
+        # Create new session
+        session_id = str(uuid.uuid4())
         try:
             load_latest_news(session_id, category=category)
             titles = generate_titles_for_session(session_id)
@@ -227,9 +238,9 @@ def create_dash_app():
                     n_clicks=0
                 )
                 buttons.append(dbc.Col(btn, md=6, lg=4))
-            return dbc.Alert([html.I(className="fas fa-check-circle me-2"), "News loaded successfully! Choose a title below."], color="success", is_open=True), dbc.Row(buttons, className="g-2")
+            return dbc.Alert([html.I(className="fas fa-check-circle me-2"), "News loaded successfully! Choose a title below."], color="success", is_open=True), dbc.Row(buttons, className="g-2"), session_id
         except Exception as e:
-            return dbc.Alert([html.I(className="fas fa-exclamation-triangle me-2"), f"Error: {e}"], color="danger", is_open=True), ""
+            return dbc.Alert([html.I(className="fas fa-exclamation-triangle me-2"), f"Error: {e}"], color="danger", is_open=True), "", no_update
 
     # Title selection -> show article and generate continuations
     @app.callback(
@@ -384,54 +395,207 @@ def create_dash_app():
             return {"display": "block"}
         return {"display": "none"}
     
-    # Session statistics callback
+    # Toggle session history panel
     @app.callback(
-        Output("session-stats", "children"),
-        Input("refresh-stats-btn", "n_clicks"),
+        [Output("history-collapse", "is_open"), Output("history-area", "children")],
+        Input("show-history-btn", "n_clicks"),
+        State("history-collapse", "is_open"),
         prevent_initial_call=True,
     )
-    def update_stats(n_clicks):
-        stats = memory.get_stats()
+    def toggle_history(n_clicks, is_open):
+        # Toggle the collapse
+        new_state = not is_open
         
-        stats_display = html.Div([
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H4(stats["active_sessions"], className="text-center mb-0"),
-                            html.P("Active Sessions", className="text-center text-muted mb-0")
+        if new_state:
+            # Load session history
+            sessions = memory.get_all_sessions()
+            
+            if not sessions:
+                return new_state, html.Div([
+                    html.I(className="fas fa-info-circle me-2"),
+                    "No previous sessions found. Generate a story to create your first session!"
+                ], className="text-muted")
+            
+            # Create cards for each session
+            session_cards = []
+            for sid, info in sessions.items():
+                # Determine badge color based on completion
+                badge_color = "success" if info["is_complete"] else "secondary"
+                badge_text = "Complete" if info["is_complete"] else "In Progress"
+                
+                card = dbc.Card([
+                    dbc.CardBody([
+                        dbc.Row([
+                            dbc.Col([
+                                html.H6([
+                                    html.I(className="fas fa-book me-2"),
+                                    info["session_name"]
+                                ], className="mb-2"),
+                                html.P(info["summary"], className="text-muted small mb-2"),
+                                html.P([
+                                    html.I(className="fas fa-clock me-1"),
+                                    f"Created: {info['created_at'][:16].replace('T', ' ')}"
+                                ], className="text-muted small mb-0"),
+                            ], md=8),
+                            dbc.Col([
+                                dbc.Badge(badge_text, color=badge_color, className="mb-2"),
+                                dbc.Button(
+                                    [html.I(className="fas fa-arrow-right me-2"), "Load"],
+                                    id={"type": "load-session-btn", "index": sid},
+                                    color="primary",
+                                    size="sm",
+                                    className="w-100"
+                                ),
+                            ], md=4, className="text-end"),
                         ])
-                    ], className="bg-primary text-white")
-                ], md=3),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H4(f"{stats['estimated_memory_mb']} MB", className="text-center mb-0"),
-                            html.P("Memory Usage", className="text-center text-muted mb-0")
-                        ])
-                    ], className="bg-info text-white")
-                ], md=3),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H4(f"{stats['average_session_age_seconds']:.1f}s", className="text-center mb-0"),
-                            html.P("Avg Session Age", className="text-center text-muted mb-0")
-                        ])
-                    ], className="bg-success text-white")
-                ], md=3),
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H4(f"{stats['timeout_minutes']}min", className="text-center mb-0"),
-                            html.P("Session Timeout", className="text-center text-muted mb-0")
-                        ])
-                    ], className="bg-warning text-dark")
-                ], md=3),
-            ], className="g-3")
-        ])
+                    ])
+                ], className="mb-3")
+                session_cards.append(card)
+            
+            return new_state, html.Div(session_cards)
+        else:
+            return new_state, "Click 'Session History' to view past sessions"
+    
+    # Load a previous session
+    @app.callback(
+        [
+            Output("session-id", "data", allow_duplicate=True),
+            Output("status", "children", allow_duplicate=True),
+            Output("history-collapse", "is_open", allow_duplicate=True),
+            Output("titles-area", "children", allow_duplicate=True),
+            Output("article-area", "children", allow_duplicate=True),
+            Output("continuations-area", "children", allow_duplicate=True),
+            Output("final-story", "children", allow_duplicate=True),
+            Output("image-area", "children", allow_duplicate=True),
+        ],
+        Input({"type": "load-session-btn", "index": dash.ALL}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def load_previous_session(n_clicks_list):
+        ctx = dash.callback_context
+        if not ctx.triggered or not any(n_clicks_list):
+            return tuple([no_update] * 8)
         
-        return stats_display
+        # Get the session ID from the triggered button
+        triggered_id = ctx.triggered[0]["prop_id"]
+        import json
+        id_str = triggered_id.split('.')[0]
+        id_dict = json.loads(id_str)
+        session_id = id_dict.get("index")
+        
+        # Check if session exists
+        state = memory.get(session_id)
+        if not state or not state.articles:
+            return (
+                no_update,
+                dbc.Alert([
+                    html.I(className="fas fa-exclamation-triangle me-2"),
+                    "Session not found or expired."
+                ], color="warning", is_open=True),
+                no_update, no_update, no_update, no_update, no_update, no_update
+            )
+        
+        # Rebuild UI based on session state
+        # Note: We don't store titles separately, so we can't restore title buttons
+        # But we can restore the selected article and continuations
+        
+        # 1. Titles area - empty since we don't store generated titles
+        titles_content = []
+        
+        # 2. Article area
+        article_content = ""
+        if state.selected_article_index is not None and state.selected_article_index < len(state.articles):
+            article = state.articles[state.selected_article_index]
+            article_content = dbc.Card([
+                dbc.CardHeader([
+                    html.I(className="fas fa-newspaper me-2"),
+                    article.title
+                ]),
+                dbc.CardBody([
+                    html.P(article.description or "", className="mb-2"),
+                    html.P(article.content or "", className="text-muted")
+                ])
+            ], className="shadow-sm")
+        
+        # 3. Continuations area
+        cont_content = []
+        if state.continuation_options:
+            for idx, cont in enumerate(state.continuation_options):
+                cont_content.append(
+                    dbc.Button(
+                        cont,
+                        id={"type": "cont-btn", "index": idx},
+                        color="info",
+                        outline=True,
+                        className="mb-2 w-100 text-start"
+                    )
+                )
+        
+        # 4. Final story
+        story_content = ""
+        if state.final_story:
+            story_content = dbc.Card([
+                dbc.CardHeader([
+                    html.I(className="fas fa-book me-2"),
+                    "Your AI-Generated Story"
+                ]),
+                dbc.CardBody(state.final_story)
+            ], className="shadow-sm")
+        
+        # 5. Image area
+        image_content = ""
+        if state.image_base64:
+            image_content = dbc.Card([
+                dbc.CardBody([
+                    html.Img(
+                        src=f"data:image/png;base64,{state.image_base64}",
+                        style={"maxWidth": "100%", "height": "auto"}
+                    )
+                ])
+            ], className="shadow-sm")
+        
+        return (
+            session_id,
+            dbc.Alert([
+                html.I(className="fas fa-check-circle me-2"),
+                f"Loaded session: {state.session_name or 'Unnamed Session'}"
+            ], color="success", is_open=True),
+            False,  # Close history panel
+            titles_content,
+            article_content,
+            cont_content,
+            story_content,
+            image_content
+        )
 
+    # Clear all session history
+    @app.callback(
+        [Output("history-area", "children", allow_duplicate=True), Output("status", "children", allow_duplicate=True)],
+        Input("clear-history-btn", "n_clicks"),
+        State("session-id", "data"),
+        prevent_initial_call=True,
+    )
+    def clear_history(n_clicks, current_session_id):
+        # Get all sessions except current one
+        all_sessions = memory.get_all_sessions()
+        cleared_count = 0
+        
+        for sid in list(all_sessions.keys()):
+            if sid != current_session_id:
+                memory._store.pop(sid, None)
+                cleared_count += 1
+        
+        return (
+            dbc.Alert([
+                html.I(className="fas fa-info-circle me-2"),
+                f"Cleared {cleared_count} session(s). Current session preserved."
+            ], color="info", is_open=True),
+            dbc.Alert([
+                html.I(className="fas fa-check-circle me-2"),
+                f"Session history cleared ({cleared_count} sessions removed)"
+            ], color="success", is_open=True)
+        )
+    
     return app
 
 

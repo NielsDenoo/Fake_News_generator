@@ -156,6 +156,9 @@ def generate_final_and_image(session_id: str):
             final_story = final_chain.generate(article.title, article.content or article.description or article.title, continuation)
             print(f"[PROGRESS] ✓ Final story generation complete")
             state.final_story = final_story
+            # Auto-generate session name from article title
+            if not state.session_name and article.title:
+                state.session_name = article.title[:60] + ("..." if len(article.title) > 60 else "")
             memory.set(session_id, state)
             break
         except Exception as e:
