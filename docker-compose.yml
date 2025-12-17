@@ -1,0 +1,46 @@
+services:
+  fake-news-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SKIP_HEAVY: "false"  # Set to "true" to skip heavy dependencies (torch, diffusers)
+    image: fake-news-generator:latest
+    container_name: fake-news-app
+    network_mode: host  # Required to access Ollama on host's localhost:11434
+    env_file:
+      - .env  # Load environment variables from .env file
+    environment:
+      - OLLAMA_BASE_URL=http://localhost:11434
+      # Add other environment variables here if needed:
+      # - HF_TOKEN=your_huggingface_token
+      # - FORCE_CPU_IMAGE=true
+    restart: unless-stopped
+    volumes:
+      # Optional: Mount cache directories to persist model downloads
+      - huggingface-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/_dash-dependencies"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  huggingface-cache:
+    driver: local
+
+# Usage:
+# 1. Make sure you have a .env file with NEWS_API_KEY
+# 2. Make sure Ollama is running on host: ollama serve
+# 3. Start the app: docker-compose up -d
+# 4. View logs: docker-compose logs -f
+# 5. Stop the app: docker-compose down
+# 6. Access the app: http://localhost:7860
+
+# To rebuild after code changes:
+# docker-compose up -d --build
+
+# To skip heavy dependencies (faster build, no image generation):
+# Change SKIP_HEAVY to "true" in the args above, then:
+# docker-compose up -d --build

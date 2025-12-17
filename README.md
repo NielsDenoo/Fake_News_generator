@@ -13,13 +13,13 @@ Langchain orchestrates the workflow, while Dash provides an interactive web inte
 
 Furthermore, the entire application runs locally using Docker, ensuring privacy and control over data.
 
-## Quick Start with Docker (Recommended)
+## Quick Start with Docker Compose (Recommended)
 
-The fastest way to run the app is using Docker. All dependencies and models are included.
+The fastest way to run the app is using Docker Compose. All dependencies and models are included.
 
 ### Prerequisites
 
-1. **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
+1. **Docker & Docker Compose** - [Install Docker](https://docs.docker.com/get-docker/)
 2. **Ollama** - [Install Ollama](https://ollama.com/download) and pull the llama3:8b model:
    ```bash
    ollama pull llama3:8b
@@ -33,54 +33,56 @@ The fastest way to run the app is using Docker. All dependencies and models are 
 
 ### Run the App
 
-**Step 1: Build the Docker image**
+**Start the app (builds automatically):**
 ```bash
-docker build -t fake_news_generator .
+docker compose up -d
 ```
-*This downloads all dependencies and ML models (~7GB). Takes 5-10 minutes on first run.*
+*First run downloads all dependencies and ML models (~7GB). Takes 5-10 minutes.*
 
-**Step 2: Start the container**
-```bash
-docker run -d --name fake_news_app --network host --env-file .env fake_news_generator
-```
+**Access the app:** **http://localhost:7860**
 
-**What this does:**
-- `-d` = Run in detached mode (background)
-- `--name fake_news_app` = Names the container for easy management
-- `--network host` = Allows container to reach Ollama on localhost:11434
-- `--env-file .env` = Loads your NewsAPI key from `.env` file
-- `fake_news_generator` = The image name
-
-**Step 3: Access the app**
-
-Open your browser to: **http://localhost:7860**
-
-### Useful Commands
+### Useful Docker Compose Commands
 
 **Watch logs (see progress and errors):**
 ```bash
-docker logs -f fake_news_app
+docker compose logs -f
 ```
 
 **Stop the container:**
 ```bash
-docker stop fake_news_app
+docker compose down
 ```
 
-**Remove the container:**
+**Rebuild after code changes:**
 ```bash
-docker rm fake_news_app
+docker compose up -d --build
 ```
 
-**Restart with fresh state:**
+**Restart the container:**
 ```bash
-docker rm -f fake_news_app
+docker compose restart
+```
+
+**Check status:**
+```bash
+docker compose ps
+```
+
+### Alternative: Manual Docker Commands
+
+**Build the Docker image:**
+```bash
+docker build -t fake_news_generator .
+```
+
+**Start the container:**
+```bash
 docker run -d --name fake_news_app --network host --env-file .env fake_news_generator
 ```
 
-**Check if container is running:**
+**Stop and remove:**
 ```bash
-docker ps --filter "name=fake_news_app"
+docker stop fake_news_app && docker rm fake_news_app
 ```
 
 ### Alternative: Docker without host networking
@@ -143,6 +145,44 @@ docker run -d --name fake_news_app --network host --env-file .env ghcr.io/nielsd
    ```
 
 5. **Access at:** http://localhost:7860
+
+## Troubleshooting
+
+### Image Generation Error
+
+If you see: `Error: Image pipeline is not available in this environment. Install 'torch' and 'diffusers' or build the Docker image without SKIP_HEAVY.`
+
+**Solution:** The image generation dependencies (torch, diffusers) are missing. 
+
+**To fix:**
+1. Make sure `SKIP_HEAVY: "false"` in `docker-compose.yml` (this is the default)
+2. Rebuild the image:
+   ```bash
+   docker compose down
+   docker compose up -d --build
+   ```
+
+This will install all ML dependencies (~2GB extra). Build takes longer but enables image generation.
+
+**Alternative:** If you don't need image generation, you can skip it by setting `SKIP_HEAVY: "true"` in `docker-compose.yml`. Story generation will still work, but final stories won't have images.
+
+### News Not Loading
+
+1. Check your `.env` file has a valid `NEWS_API_KEY`
+2. Check logs: `docker compose logs -f`
+3. Verify API key at [newsapi.org](https://newsapi.org)
+
+### Ollama Connection Error
+
+1. Ensure Ollama is running: `ollama serve`
+2. Test connection: `curl http://localhost:11434/api/tags`
+3. Make sure llama3:8b is installed: `ollama pull llama3:8b`
+
+### Container Won't Start
+
+1. Check if port 7860 is already in use: `ss -tlnp | grep 7860`
+2. View detailed logs: `docker compose logs`
+3. Try rebuilding: `docker compose up -d --build`
 
 ## How to Use the App
 
