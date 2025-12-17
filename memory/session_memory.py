@@ -96,7 +96,7 @@ class SessionMemory:
                 elif state.continuation_options:
                     summary = "📝 Ready to generate story"
                 elif state.articles:
-                    summary = f"📰 {len(state.articles)} articles loaded"
+                    summary = f"📰 news articles loaded"
                 else:
                     summary = "🆕 New session"
                 
